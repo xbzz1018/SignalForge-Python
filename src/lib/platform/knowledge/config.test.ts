@@ -42,6 +42,13 @@ describe('governed knowledge integration config', () => {
     expect(config.projectSpaceBaseUrl).toBe('https://knowledge.example/spaces/projects');
   });
 
+  it('allows the default loopback URL when knowledge is disabled in production', () => {
+    expect(getKnowledgeIntegrationConfig({
+      NODE_ENV: 'production',
+      SIGNALFORGE_KNOWLEDGE_ENABLED: '0',
+    })).toMatchObject({ enabled: false, oauth: null });
+  });
+
   it('requires OAuth and HTTPS in production', () => {
     expect(() => getKnowledgeIntegrationConfig({
       NODE_ENV: 'production',
