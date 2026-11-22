@@ -458,7 +458,11 @@ describe('PI Agent structured read tools', () => {
 
   it('fails closed for traversal, escaping symlinks, invalid JSON, and JSON text queries', async () => {
     await fs.writeFile(path.join(outside, 'secret.json'), '{"secret":"HOST-SECRET"}', 'utf8');
-    await fs.symlink(path.join(outside, 'secret.json'), path.join(workspace, 'evidence', 'escape.json'));
+    await fs.symlink(
+      outside,
+      path.join(workspace, 'evidence', 'escape'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     await fs.writeFile(path.join(workspace, 'evidence', 'invalid.json'), '{broken', 'utf8');
     const jsonTool = createQueryJsonTool({ workspaceRoot: workspace });
     const textTool = createQueryTextFileTool({ workspaceRoot: workspace });
@@ -468,7 +472,7 @@ describe('PI Agent structured read tools', () => {
       pointers: [''],
     })).resolves.toMatchObject({ ok: false, error: { code: 'PATH_TRAVERSAL_DENIED' } });
     const escaped = await invoke(jsonTool, {
-      path: 'evidence/escape.json',
+      path: 'evidence/escape/secret.json',
       pointers: [''],
     });
     expect(escaped).toMatchObject({ ok: false, error: { code: 'SYMLINK_ESCAPE_DENIED' } });
