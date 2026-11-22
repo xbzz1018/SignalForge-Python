@@ -93,7 +93,7 @@ function LatestResearchCard({ report, onOpenReports, onSend, isSending }: {
       <div className="border-b border-border/50 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.12),transparent_42%),hsl(var(--card))] p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 max-w-3xl"><div className="flex flex-wrap items-center gap-2"><Badge className={cn("hover:bg-inherit", riskClass(report.riskLevel))}>{riskLabel(report.riskLevel)}</Badge><Badge variant="outline" className="text-muted-foreground">{formatResearchTime(report.createdAt)}</Badge></div><h3 className="mt-3 text-xl font-black leading-8 text-foreground">{report.title}</h3><p className="mt-2 text-sm leading-7 text-muted-foreground">{report.summary}</p></div>
-          <div className="shrink-0 text-left sm:text-right"><p className={cn("text-4xl font-black tabular-nums", scoreTone(report.score))}>{report.score}</p><p className="mt-1 text-[11px] text-muted-foreground">研究评分 / 100</p></div>
+          <div className="shrink-0 text-left sm:text-right"><p className={cn("text-4xl font-black tabular-nums", scoreTone(report.score))}>{report.score ?? "—"}</p><p className="mt-1 text-[11px] text-muted-foreground">研究评分 / 100</p></div>
         </div>
       </div>
       <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px]">

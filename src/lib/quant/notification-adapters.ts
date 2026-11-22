@@ -17,7 +17,7 @@ export interface ResearchNotificationReportInput {
   id: string;
   title: string;
   summary: string;
-  score: number;
+  score: number | null;
   recommendation: string;
   riskLevel: string;
   contentMarkdown: string;
@@ -77,8 +77,10 @@ function renderPlainText(report: ResearchNotificationReportInput) {
     '',
     report.summary,
     '',
-    `评分：${report.score}/100`,
-    `风险：${report.riskLevel}`,
+    ...(report.score === null ? ['本次未评估评分及风险等级。'] : [
+      `评分：${report.score}/100`,
+      `风险：${report.riskLevel}`,
+    ]),
     `建议：${report.recommendation}`,
   ].join('\n');
 }

@@ -35,7 +35,7 @@ import {
 } from "./ResearchConsolePrimitives";
 import { formatResearchTime, reportCandidates, reportCoverage, reportRisks } from "./researchViewModel";
 
-type RiskFilter = "all" | "low" | "medium" | "high";
+type RiskFilter = "all" | "low" | "medium" | "high" | "unassessed";
 
 function MarkdownDocument({ content }: { content: string }) {
   const blocks = useMemo(() => {
@@ -77,7 +77,7 @@ function ReportCard({ report, onOpen }: { report: ResearchReportSnapshot; onOpen
     <button type="button" onClick={onOpen} className="group flex min-h-[280px] flex-col rounded-xl border border-border/65 bg-card/90 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_18px_42px_-34px_hsl(var(--shadow-color)/0.55)]">
       <div className="flex items-start justify-between gap-4">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileText className="h-5 w-5" /></span>
-        <div className="text-right"><p className={cn("text-2xl font-black tabular-nums", scoreTone(report.score))}>{report.score}</p><p className="text-[10px] text-muted-foreground">研究评分</p></div>
+        <div className="text-right"><p className={cn("text-2xl font-black tabular-nums", scoreTone(report.score))}>{report.score ?? "—"}</p><p className="text-[10px] text-muted-foreground">研究评分</p></div>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2"><Badge className={cn("hover:bg-inherit", riskClass(report.riskLevel))}>{riskLabel(report.riskLevel)}</Badge><Badge variant="outline" className="text-[10px] text-muted-foreground">{formatResearchTime(report.createdAt)}</Badge></div>
       <h3 className="mt-3 line-clamp-2 text-base font-bold leading-6 text-foreground group-hover:text-primary">{report.title}</h3>
@@ -108,13 +108,13 @@ function ReportDetail({ report, open, onOpenChange, onSend, isSending }: {
         <SheetHeader className="border-b border-border/50 bg-card/80 px-5 py-5 text-left">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><SheetTitle className="text-lg">{report.title}</SheetTitle><Badge className={cn("hover:bg-inherit", riskClass(report.riskLevel))}>{riskLabel(report.riskLevel)}</Badge></div><SheetDescription className="mt-1 leading-5">{formatResearchTime(report.createdAt, true)} · {report.source}</SheetDescription></div>
-            <p className={cn("text-3xl font-black tabular-nums", scoreTone(report.score))}>{report.score}</p>
+            <p className={cn("text-3xl font-black tabular-nums", scoreTone(report.score))}>{report.score ?? "—"}</p>
           </div>
         </SheetHeader>
         <div className="flex-1 space-y-7 overflow-y-auto px-5 py-5">
           <section className="rounded-xl border border-primary/20 bg-primary/5 p-4"><p className="text-sm font-bold text-foreground">{report.summary}</p><p className="mt-2 text-xs leading-5 text-muted-foreground">研究建议：{report.recommendation}</p></section>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-lg border border-border/60 bg-card p-3 text-center"><p className="text-[10px] text-muted-foreground">评分</p><p className={cn("mt-1 text-lg font-black", scoreTone(report.score))}>{report.score}</p></div>
+            <div className="rounded-lg border border-border/60 bg-card p-3 text-center"><p className="text-[10px] text-muted-foreground">评分</p><p className={cn("mt-1 text-lg font-black", scoreTone(report.score))}>{report.score ?? "—"}</p></div>
             <div className="rounded-lg border border-border/60 bg-card p-3 text-center"><p className="text-[10px] text-muted-foreground">候选</p><p className="mt-1 text-lg font-black text-foreground">{candidates.length}</p></div>
             <div className="rounded-lg border border-border/60 bg-card p-3 text-center"><p className="text-[10px] text-muted-foreground">证据</p><p className="mt-1 text-lg font-black text-foreground">{report.evidence.length}</p></div>
             <div className="rounded-lg border border-border/60 bg-card p-3 text-center"><p className="text-[10px] text-muted-foreground">覆盖率</p><p className="mt-1 text-lg font-black text-foreground">{coverage ? `${Math.round(coverage.coverageRatio * 100)}%` : "-"}</p></div>
@@ -158,7 +158,7 @@ export function ResearchReportLibrary({ reports, onOpenAutomation, onSend, isSen
       <ResearchSectionHeader eyebrow="REPORT LIBRARY" title="研究报告库" description="保留评分、风险、候选标的、证据和复核清单，每份日报都可以回到生成时的事实现场。" />
       <section className="flex flex-col gap-3 sm:flex-row">
         <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索标题、候选标的、建议或来源" className="h-10 bg-card pl-9" aria-label="搜索研究报告" /></div>
-        <div className="flex flex-wrap gap-1.5">{(["all", "high", "medium", "low"] as RiskFilter[]).map((item) => { const label = item === "all" ? "全部风险" : riskLabel(item); return <button key={item} type="button" onClick={() => setRisk(item)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold", risk === item ? "border-primary/30 bg-primary/10 text-primary" : "border-border/60 bg-card text-muted-foreground")}>{label}</button>; })}</div>
+        <div className="flex flex-wrap gap-1.5">{(["all", "high", "medium", "low", "unassessed"] as RiskFilter[]).map((item) => { const label = item === "all" ? "全部风险" : riskLabel(item); return <button key={item} type="button" onClick={() => setRisk(item)} className={cn("rounded-lg border px-3 py-2 text-xs font-semibold", risk === item ? "border-primary/30 bg-primary/10 text-primary" : "border-border/60 bg-card text-muted-foreground")}>{label}</button>; })}</div>
       </section>
       {filtered.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map((report) => <ReportCard key={report.id} report={report} onOpen={() => { setSelected(report); setDetailOpen(true); }} />)}</div> : reports.length ? <EmptyState icon={<FileSearch className="h-5 w-5" />} title="没有匹配的报告" description="调整关键词或风险筛选后再试。" className="rounded-xl border border-border/60 bg-card py-10 sm:py-12" /> : <section data-research-empty className="rounded-2xl border border-dashed border-primary/25 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.12),transparent_38%),hsl(var(--card))] px-5 py-10 text-center sm:px-6 sm:py-12"><span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></span><h3 className="mt-4 text-xl font-black text-foreground">报告库等待首份研究日报</h3><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">系统会从观察池采样行情覆盖、候选筛选和分析层状态，生成结构化报告并保存完整证据。</p><div className="mx-auto mt-4 flex max-w-xl flex-wrap justify-center gap-2"><Badge variant="outline" className="bg-background/60">采样行情覆盖</Badge><Badge variant="outline" className="bg-background/60">生成候选与评分</Badge><Badge variant="outline" className="bg-background/60">保存证据与复核项</Badge></div><Button variant="outline" className="mt-4" onClick={onOpenAutomation}>检查生成条件<ArrowRight className="h-4 w-4" /></Button></section>}
       <ReportDetail report={selected} open={detailOpen} onOpenChange={setDetailOpen} onSend={onSend} isSending={isSending} />

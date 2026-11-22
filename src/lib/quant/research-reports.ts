@@ -65,7 +65,7 @@ export interface ResearchReportSnapshot {
   title: string;
   summary: string;
   reportDate: string;
-  score: number;
+  score: number | null;
   recommendation: string;
   riskLevel: string;
   contentMarkdown: string;
@@ -142,7 +142,7 @@ interface MarketProbe<T = unknown> {
 interface ReportBuildResult {
   title: string;
   summary: string;
-  score: number;
+  score: number | null;
   recommendation: string;
   riskLevel: string;
   contentMarkdown: string;
@@ -299,6 +299,11 @@ async function fetchMarketProbe<T>(pathName: string, source: string, timeoutMs =
       };
     }
     const data = await response.json() as T;
+    if (pathName === '/api/v1/analytics/clickhouse/health' && asRecord(data).status !== 'ok') {
+      const disabled = asRecord(data).status === 'disabled';
+      return { data, evidence: { source, status: disabled ? 'disabled' : 'unavailable',
+        detail: disabled ? 'ClickHouse 未启用。' : 'ClickHouse 健康检查未通过。', capturedAt } };
+    }
     return {
       data,
       evidence: {
@@ -414,7 +419,7 @@ function mapReport(report: {
     title: report.title,
     summary: report.summary,
     reportDate: report.reportDate.toISOString(),
-    score: report.score,
+    score: report.riskLevel === 'unassessed' ? null : report.score,
     recommendation: report.recommendation,
     riskLevel: report.riskLevel,
     contentMarkdown: report.contentMarkdown,
@@ -484,7 +489,7 @@ function mapNotificationReport(report: {
     id: report.id,
     title: report.title,
     summary: report.summary,
-    score: report.score,
+    score: report.riskLevel === 'unassessed' ? null : report.score,
     recommendation: report.recommendation,
     riskLevel: report.riskLevel,
     contentMarkdown: report.contentMarkdown,
@@ -715,7 +720,7 @@ function buildProviderMatrix(
   ];
 }
 
-function buildReport(params: {
+export function buildDailyResearchReport(params: {
   watchlist: ResearchWatchlistSnapshot;
   universesProbe: MarketProbe;
   screenerProbe: MarketProbe;
@@ -729,32 +734,48 @@ function buildReport(params: {
 
   const universes = extractUniverses(params.universesProbe.data);
   const candidates = extractCandidates(params.screenerProbe.data);
-  const targetUniverse = universes.find((universe) => asString(universe.id) === params.watchlist.universeId) ?? universes[0] ?? {};
+  const targetUniverse = universes.find((universe) => asString(universe.id) === (params.watchlist.universeId ?? DEFAULT_UNIVERSE_ID));
+  if (!targetUniverse && evidence[0].status === 'available') {
+    evidence[0] = { ...evidence[0], status: 'partial', detail: '本地行情库没有返回当前观察池的覆盖记录。' };
+  }
   const analytics = asRecord(asRecord(params.screenerProbe.data).analytics);
   const unavailableCount = evidence.filter((item) => statusPriority(item.status) <= 1).length;
-  const readyCount = asNumber(targetUniverse.ready_count) ?? 0;
-  const memberCount = asNumber(targetUniverse.member_count) ?? params.watchlist.symbols.length;
+  const readyCount = asNumber(targetUniverse?.ready_count) ?? 0;
+  const memberCount = asNumber(targetUniverse?.member_count) ?? params.watchlist.symbols.length;
   const coverageRatio = memberCount > 0 ? readyCount / memberCount : 0;
   const candidateBoost = Math.min(12, candidates.length * 2);
   const dataPenalty = unavailableCount * 8;
   const coverageScore = Math.round(Math.min(18, coverageRatio * 18));
-  const score = Math.max(45, Math.min(90, 62 + coverageScore + candidateBoost - dataPenalty));
-  const riskLevel = deriveRiskLevel(score, unavailableCount);
-  const recommendation = deriveRecommendation(score, unavailableCount);
+  const screener = asRecord(params.screenerProbe.data);
+  const eligible = asNumber(screener.eligible_symbols);
+  let reason: string | null = null;
+  if (params.screenerProbe.evidence.status !== 'available' || !Array.isArray(screener.candidates)) {
+    reason = '筛选结果不可用，请检查行情服务后重试。';
+  } else if (!candidates.length) {
+    if (eligible != null && eligible > 0) {
+      reason = `本次有 ${eligible} 个标的具备筛选条件，没有标的命中本次策略。`;
+    } else if (targetUniverse && readyCount === 0) {
+      reason = `当前股票池日线就绪 ${readyCount}/${memberCount}，请先补齐日线后再筛选。`;
+    } else {
+      reason = '未取得可参与筛选的标的，请核对交易日、行情覆盖和筛选条件。';
+    }
+  }
+  const evidenceScore = Math.max(45, Math.min(90, 62 + coverageScore + candidateBoost - dataPenalty));
+  const score = reason ? null : evidenceScore;
+  const riskLevel = reason ? 'unassessed' : deriveRiskLevel(evidenceScore, unavailableCount);
+  const recommendation = reason ?? deriveRecommendation(evidenceScore, unavailableCount);
 
   const topCandidates = candidates.slice(0, 5).map(candidateLabel);
   const evidenceLines = evidence.map((item) => `- ${item.source}: ${item.status}，${item.detail}`);
   const checklist = [
-    candidates.length > 0 ? '核对前 3 个候选标的的最新 K 线、成交额和涨跌停状态。' : '先检查筛选条件和本地行情覆盖，确认为何没有候选标的。',
+    candidates.length > 0 ? '核对前 3 个候选标的的最新 K 线、成交额和涨跌停状态。' : recommendation,
     coverageRatio >= 0.8 ? '股票池覆盖率可用于日报观察，继续保留补数监控。' : '优先补齐股票池日线覆盖，避免日报结论偏样本。',
     analytics.engine === 'clickhouse' ? 'ClickHouse 已参与筛选，可继续扩展横截面因子。' : '当前未确认 ClickHouse 命中，批量筛选仍需关注性能。',
     '任何买卖动作必须结合人工复核和风控仓位，不把日报作为即时交易指令。',
   ];
 
   const title = `${reportDateValue()} ${params.watchlist.name} 投研日报`;
-  const summary = candidates.length > 0
-    ? `本次生成 ${candidates.length} 个候选标的，综合评分 ${score}，建议：${recommendation}。`
-    : `本次未生成候选标的，综合评分 ${score}，重点处理数据覆盖和筛选证据。`;
+  const summary = reason ?? `本次生成 ${candidates.length} 个候选标的，综合评分 ${score}，建议：${recommendation}。`;
 
   const contentMarkdown = [
     `# ${title}`,
@@ -763,9 +784,11 @@ function buildReport(params: {
     summary,
     '',
     `## 综合评分`,
-    `- 评分：${score}/100`,
-    `- 风险等级：${riskLevelLabel(riskLevel)}`,
-    `- 建议：${recommendation}`,
+    ...(score === null ? ['本次未评估评分及风险等级。'] : [
+      `- 评分：${score}/100`,
+      `- 风险等级：${riskLevelLabel(riskLevel)}`,
+      `- 建议：${recommendation}`,
+    ]),
     '',
     `## 观察池`,
     `- 股票池：${params.watchlist.universeId ?? '未绑定'}`,
@@ -895,7 +918,7 @@ export async function runDailyResearchReport(
       fetchMarketProbe(`/api/v1/analytics/clickhouse/health`, 'ClickHouse 分析层'),
     ]);
 
-    const builtReport = buildReport({ watchlist, universesProbe, screenerProbe, clickhouseProbe });
+    const builtReport = buildDailyResearchReport({ watchlist, universesProbe, screenerProbe, clickhouseProbe });
     const report = await prisma.researchReport.create({
       data: {
         runId: run.id,
@@ -908,7 +931,8 @@ export async function runDailyResearchReport(
           symbols: watchlist.symbols,
           markets: watchlist.markets,
         }),
-        score: builtReport.score,
+        // The existing integer column is required. Unassessed reports expose null on read.
+        score: builtReport.score ?? 0,
         recommendation: builtReport.recommendation,
         riskLevel: builtReport.riskLevel,
         contentMarkdown: builtReport.contentMarkdown,
