@@ -129,7 +129,10 @@ def test_gap_strategy_uses_actual_history_and_reports_short_coverage(count, monk
     with TestClient(app) as client:
         if count == 20:
             for end in ({}, {"end": "20500101"}):
-                result = client.get(f"{url}/gap_reversal/fixture", params={"limit": 20, "adjustment": "none", **end})
+                result = client.get(
+                    f"{url}/gap_reversal/fixture",
+                    params={"limit": 20, "adjustment": "none", **end},
+                )
                 assert result.status_code == 200, result.text
                 assert result.json()["summary"]["sample_count"] == 20
                 assert requests[-1]["end"] is None
@@ -144,7 +147,9 @@ def test_gap_strategy_uses_actual_history_and_reports_short_coverage(count, monk
             body = result.json()
             assert requests[-1]["limit"] == 1500
             assert body["summary"]["sample_count"] == 1370
-            assert any("区间覆盖可能不足" in warning for warning in body["data_quality"]["warnings"])
+            assert any(
+                "区间覆盖可能不足" in warning for warning in body["data_quality"]["warnings"]
+            )
             replay_backtest(body)
 
 

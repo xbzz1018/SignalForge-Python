@@ -75,7 +75,10 @@ STRATEGY_LOOKBACKS = {
 
 
 def strategy_warmup_bars(strategy_id: str, parameters: dict[str, Any]) -> int:
-    return max((parameters[key] + offset for key, offset in STRATEGY_LOOKBACKS[strategy_id]), default=1)
+    return max(
+        (parameters[key] + offset for key, offset in STRATEGY_LOOKBACKS[strategy_id]),
+        default=1,
+    )
 
 
 PERIODS_PER_YEAR = {"daily": 252, "weekly": 52, "monthly": 12}

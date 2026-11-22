@@ -295,11 +295,17 @@ def build_strategy_backtest(
     if normalized_strategy_id == "turtle_trend":
         fast_window, slow_window = params["breakout_window"], params["exit_window"]
     else:
-        fast_window = params.get("fast_window", params.get("lookback_window", params.get("breakout_window", 20)))
-        slow_window = params.get("slow_window", params.get("trend_window", params.get("exit_window", 60)))
+        fast_window = params.get(
+            "fast_window", params.get("lookback_window", params.get("breakout_window", 20))
+        )
+        slow_window = params.get(
+            "slow_window", params.get("trend_window", params.get("exit_window", 60))
+        )
 
     params["fee_bps"] = str(fee_bps)
-    decimal_params = {key: Decimal(value) for key, value in params.items() if isinstance(value, str)}
+    decimal_params = {
+        key: Decimal(value) for key, value in params.items() if isinstance(value, str)
+    }
     cash = finite_decimal(initial_cash, "initial_cash")
     if not cash.is_finite() or cash <= 0:
         raise ValueError("initial_cash 必须为大于 0 的有限数值。")
