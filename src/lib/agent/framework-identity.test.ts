@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -69,9 +71,11 @@ describe('PI Agent framework identity', () => {
   });
 
   it('binds untracked paths and contents deterministically within a hard budget', () => {
+    const cwd = resolve('/repo');
+    const sourcePath = resolve(cwd, 'src/new-agent.ts');
     const contents = new Map([
-      ['/repo/src/new-agent.ts', Buffer.from('version one')],
-      ['/repo/docs/new.md', Buffer.from('documentation')],
+      [sourcePath, Buffer.from('version one')],
+      [resolve(cwd, 'docs/new.md'), Buffer.from('documentation')],
     ]);
     const readEntry = vi.fn((absolutePath: string) => ({
       kind: 'file' as const,
@@ -79,23 +83,23 @@ describe('PI Agent framework identity', () => {
     }));
     const original = fingerprintUntrackedFiles(
       ['src/new-agent.ts', 'docs/new.md'],
-      { cwd: '/repo', maxContentBytes: 64, readEntry },
+      { cwd, maxContentBytes: 64, readEntry },
     );
 
     expect(fingerprintUntrackedFiles(
       ['docs/new.md', 'src/new-agent.ts'],
-      { cwd: '/repo', maxContentBytes: 64, readEntry },
+      { cwd, maxContentBytes: 64, readEntry },
     )).toBe(original);
 
-    contents.set('/repo/src/new-agent.ts', Buffer.from('version two'));
+    contents.set(sourcePath, Buffer.from('version two'));
     expect(fingerprintUntrackedFiles(
       ['src/new-agent.ts', 'docs/new.md'],
-      { cwd: '/repo', maxContentBytes: 64, readEntry },
+      { cwd, maxContentBytes: 64, readEntry },
     )).not.toBe(original);
 
     expect(() => fingerprintUntrackedFiles(
       ['src/new-agent.ts', 'docs/new.md'],
-      { cwd: '/repo', maxContentBytes: 8, readEntry },
+      { cwd, maxContentBytes: 8, readEntry },
     )).toThrow(/exceeds fingerprint budget/);
   });
 });

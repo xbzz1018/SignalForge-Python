@@ -270,7 +270,7 @@ async function fetchDailyKlineDetail(symbol: string, adjustment: string): Promis
     }),
   });
   const payload = await response.json();
-  if (!response.ok || !payload.success) throw new Error(payload.error ?? "读取 K 线失败");
+  if (!response.ok || !payload.success) throw new Error(strategyApiErrorMessage(payload, "读取 K 线失败"));
   return deriveKlineResponse(payload.data as StrategyLocalKlineResponse, "daily", klineFetchLimit("daily"));
 }
 
@@ -293,7 +293,7 @@ async function loadCachedKlineDetail(
           timeframe,
           klineFetchLimit(timeframe)
         );
-    setBoundedCacheValue(klineDetailCache, key, data);
+    if (data.bars.length) setBoundedCacheValue(klineDetailCache, key, data);
     return data;
   })();
 
@@ -1254,14 +1254,14 @@ export function StockKlineDetail({
   }, [loadIntradayDetail, loadRealtimeQuote]);
 
   const loadDetail = useCallback(async (timeframe: KlineTimeframe) => {
+    const requestId = ++detailRequestIdRef.current;
     if (timeframe === "realtime") {
+      setIsLoadingDetail(false);
       setDetailTimeframe("realtime");
       setSelectedBarTs(null);
       setDetailError(null);
       return;
     }
-    const requestId = detailRequestIdRef.current + 1;
-    detailRequestIdRef.current = requestId;
     setDetailTimeframe(timeframe);
     setSelectedBarTs(null);
     setDetailError(null);
@@ -1301,6 +1301,9 @@ export function StockKlineDetail({
 
   useEffect(() => {
     void loadDetail(initialTimeframe);
+    return () => {
+      detailRequestIdRef.current += 1;
+    };
   }, [initialTimeframe, loadDetail]);
 
   useEffect(() => {
@@ -1391,13 +1394,12 @@ export function StockKlineDetail({
                     void loadDetail(option.id);
                   }
                 }}
-                disabled={isLoadingDetail || isLoadingRealtime || isLoadingIntraday}
+                aria-pressed={detailTimeframe === option.id}
                 className={cn(
                   "rounded px-3 text-sm font-medium transition-colors",
                   detailTimeframe === option.id
                     ? "bg-white text-blue-700 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700",
-                  (isLoadingDetail || isLoadingRealtime || isLoadingIntraday) && "cursor-wait opacity-70"
+                    : "text-slate-500 hover:text-slate-700"
                 )}
               >
                 {option.label}
@@ -1444,14 +1446,16 @@ export function StockKlineDetail({
         ) : isLoadingDetail ? (
           <div className="flex h-80 items-center justify-center gap-2 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" />
-            正在读取本地 TimescaleDB K 线...
+            正在读取 K 线…
           </div>
-        ) : detailError ? (
-          <div className="m-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {detailError}
+        ) : detailError || (detail && !detail.bars.length) ? (
+          <div role="status" className="m-5 flex items-center gap-3 rounded-md border px-4 py-3 text-sm">
+            {detailError ? `读取 ${member.symbol} K 线失败：${detailError}` : `${member.symbol} 暂无可用 K 线（${adjustment}）。`}
+            <Button size="sm" variant="outline" onClick={() => void loadDetail(detailTimeframe)}>重试</Button>
           </div>
         ) : detail ? (
           <div className="p-5">
+            <p className="mb-2 text-xs text-slate-500">数据来源：{detail.provider || member.provider} · {detail.bars.length} 根 · {detail.adjustment}</p>
             <KlineMiniChart
               bars={detail.bars}
               dividendEvents={dividendEvents}

@@ -1,4 +1,5 @@
 import path from 'path';
+import { writeWorkspaceJsonAtomic } from '@/lib/data-agent/workspace-files';
 import { ensureBaselineEvidenceFiles } from '@/lib/quant/evidence';
 import { appendQuantWorkspaceEvent, QuantRunPlan } from '@/lib/domains/finance/workspace';
 import { serializeQuantVisualizationTemplate } from '@/lib/domains/finance/visualization-templates';
@@ -402,11 +403,10 @@ export async function writeEmptyScreenerResult(params: {
     },
     warnings,
   };
-  const finalPath = path.join(params.projectPath, 'data_file', 'final', 'dashboard-data.json');
-  await writeJson(finalPath, finalData);
+  const finalDataPath = 'data_file/final/dashboard-data.json';
+  await writeWorkspaceJsonAtomic(params.projectPath, finalDataPath, finalData);
   await ensureBaselineEvidenceFiles(params.projectPath, { force: true });
 
-  const finalDataPath = path.relative(params.projectPath, finalPath).replaceAll(path.sep, '/');
   await appendQuantWorkspaceEvent(params.projectPath, {
     event_type: 'data_prefetched',
     stage: 'data_collection',
