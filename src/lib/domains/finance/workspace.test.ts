@@ -71,6 +71,16 @@ async function buildRewrite(params: {
 }
 
 describe('writeInitialRunPlan', () => {
+  it('requests historical prices for a single-security fundamental dashboard', async () => {
+    const projectPath = await createProject();
+    const query = '生成贵州茅台的基本面研究看板';
+    const queryRewrite = await buildRewrite({ query, targets: ['贵州茅台'], symbolByTarget: { 贵州茅台: '600519' } });
+    const plan = await writeInitialRunPlan({ projectPath, instruction: query, requestId: 'fundamental-dashboard',
+      capabilityId: 'fundamental_analysis', capabilitySource: 'manual', queryRewrite });
+    expect(plan.capabilityId).toBe('fundamental_analysis');
+    expect(plan.visualization.required).toBe(true);
+    expect(plan.dataRequirements).toContain('GET /api/v1/quotes/history/{symbol}');
+  });
   it('persists executable backtest inputs or requests clarification before fetching', async () => {
     for (const valid of [true, false]) {
       const projectPath = await createProject();
