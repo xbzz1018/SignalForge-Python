@@ -591,9 +591,12 @@ export async function writeInitialRunPlan(params: {
   const timeRange = clarification.required || refused
     ? requestedTimeRange
     : requestedTimeRange ?? inferDefaultTimeRange(capability.id);
+  const needsDashboard = !refused && !clarification.required && queryRewrite.outputIntent === 'dashboard';
   const dataRequirements = Array.from(
     new Set([
       ...executionCapability.dataEndpoints,
+      ...(needsDashboard && symbols.length > 0 && executionCapability.id === 'fundamental_analysis'
+        ? ['GET /api/v1/quotes/history/{symbol}'] : []),
       ...(quantSettings.dataEndpoints ?? []),
     ])
   );
@@ -658,10 +661,7 @@ export async function writeInitialRunPlan(params: {
           ...buildAnalysisSteps(capability.id, symbols.length > 0, planningInstruction),
         ],
     visualization: {
-      required:
-        !refused &&
-        !clarification.required &&
-        queryRewrite.outputIntent === 'dashboard',
+      required: needsDashboard,
       templateId: visualizationTemplate.templateId,
       name: visualizationTemplate.name,
       scenario: visualizationTemplate.scenario,

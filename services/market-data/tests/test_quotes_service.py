@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import pytest
 
 from signalforge_market_data.cache import MarketDataCache
-from signalforge_market_data.contracts.quotes import KlineResponse, SymbolResolveResult
+from signalforge_market_data.contracts.quotes import KlineBar, KlineResponse, SymbolResolveResult
 from signalforge_market_data.providers.eastmoney import EastMoneyError
 from signalforge_market_data.services import quotes
 
@@ -133,6 +133,28 @@ class IntradayProvider(DummyProvider):
             symbol=symbol, secid="1.600519", source="fixture", period="minute5",
             adjustment="none", name=kwargs["end"], bars=[], fetched_at=datetime.now(UTC),
         )
+
+
+def test_intraday_limit_applies_before_caching_when_provider_returns_a_full_session(monkeypatch):
+    async def full_session(*_args, **_kwargs):
+        return KlineResponse(
+            symbol="510300", secid="1.510300", period="minute1", adjustment="none",
+            fetched_at=datetime.now(UTC),
+            bars=[KlineBar(date=f"2026-11-20 09:{minute}", close=4) for minute in range(31, 36)],
+        )
+
+    async def scenario():
+        cache = MemoryRedis()
+        for expected in ("miss", "redis-hit"):
+            response = await quotes.get_intraday_history_quote(
+                DummyProvider(), cache, symbol="510300", period="minute1", limit=2,
+                end="20500101", refresh=False,
+            )
+            assert response.fetch.cache_status == expected
+            assert [bar.date for bar in response.bars] == ["2026-11-20 09:34", "2026-11-20 09:35"]
+
+    monkeypatch.setattr(quotes, "fetch_intraday_kline_with_retry", full_session)
+    asyncio.run(scenario())
 
 
 def test_intraday_cache_separates_end_dates_and_preserves_same_query_fallback(monkeypatch):

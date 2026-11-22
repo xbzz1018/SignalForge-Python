@@ -360,6 +360,13 @@ export function mapCoverageItem(value: unknown): StrategyDataCoverageItem {
   };
 }
 
+export function hasChartableOhlc(value: unknown) {
+  const row = asRecord(value);
+  const date = asString(row.ts, asString(row.date));
+  const prices = [row.open, row.high, row.low, row.close].map(asNumber);
+  return Boolean(date.trim()) && prices.every(price => price !== null && price > 0);
+}
+
 export function mapLocalKlineBar(value: unknown): StrategyLocalKlineBar {
   const record = asRecord(value);
   const metadata = asRecord(record.metadata);

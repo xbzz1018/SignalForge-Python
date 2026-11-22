@@ -23,6 +23,7 @@ import {
   mapDividendEventsResponse,
   mapSectorCapitalFlowResponse,
   mapLocalKlineResponse,
+  hasChartableOhlc,
   mapRealtimeQuote,
   mapIngestionJobsResponse,
   mapDataQualityScan,
@@ -339,7 +340,7 @@ export async function getStrategySymbolBars(params: {
   provider?: string | null;
   limit?: number;
   includeMetadata?: boolean;
-    signal?: AbortSignal;
+  signal?: AbortSignal;
 }): Promise<StrategyLocalKlineResponse> {
   const query = new URLSearchParams({
     timeframe: params.timeframe || 'daily',
@@ -353,7 +354,22 @@ export async function getStrategySymbolBars(params: {
     { timeoutMs: 12_000, init: { signal: params.signal } }
   );
 
-  return mapLocalKlineResponse(responseData);
+  const local = mapLocalKlineResponse(responseData);
+  if (local.bars.length || query.get('timeframe') !== 'daily' || params.provider) return local;
+
+  const history = new URLSearchParams({
+    period: 'daily', adjustment: local.adjustment,
+    limit: String(Math.max(1, Math.min(params.limit ?? 240, 1000))),
+  });
+  const upstream = await fetchMarketApiJson<unknown>(
+    `/api/v1/quotes/history/${encodeURIComponent(params.symbol)}?${history}`,
+    { timeoutMs: 12_000, init: { signal: params.signal } },
+  );
+  const record = asRecord(upstream);
+  // History providers can return missing OHLC values on suspended sessions.
+  // Drop those rows before the shared mapper would turn absent prices into zero.
+  const bars = Array.isArray(record.bars) ? record.bars.filter(hasChartableOhlc) : [];
+  return mapLocalKlineResponse({ ...record, bars });
 }
 
 export async function getStrategySymbolDividends(params: {

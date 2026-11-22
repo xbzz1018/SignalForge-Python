@@ -191,13 +191,21 @@ class BacktestResponse(BaseModel):
             observed_end = date.fromisoformat(self.equity_curve[-1].date)
             gap = (requested_end - observed_end).days
             if self.period == "monthly":
-                short = (observed_end.year, observed_end.month) < (requested_end.year, requested_end.month)
+                observed_month = (observed_end.year, observed_end.month)
+                requested_month = (requested_end.year, requested_end.month)
+                short = observed_month < requested_month
             elif self.period == "weekly":
                 short = gap >= 7
             else:
-                short = any((observed_end + timedelta(days=step)).weekday() < 5 for step in range(1, min(gap, 7) + 1))
+                short = any(
+                    (observed_end + timedelta(days=step)).weekday() < 5
+                    for step in range(1, min(gap, 7) + 1)
+                )
             if short:
-                warnings.append(f"回测行情仅到 {observed_end}，早于请求截止日 {requested_end}，区间覆盖可能不足。")
+                warnings.append(
+                    f"回测行情仅到 {observed_end}，早于请求截止日 {requested_end}，"
+                    "区间覆盖可能不足。"
+                )
         if not self.trades:
             warnings.append("样本区间内未产生完整交易。")
         self.data_quality = _merge_data_quality(

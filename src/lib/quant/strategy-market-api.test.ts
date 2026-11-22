@@ -5,7 +5,7 @@ vi.mock('@/lib/config/degradation', () => ({
   getRuntimeDegradationConfig: () => ({ components: { marketApi: config } }),
 }));
 import { fetchMarketApiJson, fetchBacktest } from './strategy-market-api';
-import { controlStrategyIngestionJob } from './strategy-market-client';
+import { controlStrategyIngestionJob, getStrategySymbolBars } from './strategy-market-client';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -15,6 +15,26 @@ afterEach(() => {
 });
 
 describe('strategy market transport', () => {
+  it('reads daily history on a local miss without inventing missing prices', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ symbol: '000300.SH', adjustment: 'none', bars: [] }))
+      .mockResolvedValueOnce(Response.json({ symbol: '000300', secid: '1.000300', source: 'eastmoney', adjustment: 'none', bars: [
+        { date: '2026-10-12', open: '10', close: '11', high: '12', low: '9' },
+        { date: '2026-10-13', open: null, close: '11', high: '12', low: '9' },
+      ] }));
+    vi.stubGlobal('fetch', fetcher);
+    const result = await getStrategySymbolBars({ symbol: '000300.SH', adjustment: 'none' });
+    expect(fetcher.mock.calls[1][0].toString()).toContain('/quotes/history/000300.SH?period=daily&adjustment=none');
+    expect(result).toMatchObject({ provider: 'eastmoney', summary: { rowCount: 1 }, bars: [{ close: 11 }] });
+  });
+
+  it.each([true, false])('preserves local coverage or explicit provider selection: hit=%s', async hit => {
+    const bars = hit ? [{ ts: '2026-10-12', open: 10, close: 11, high: 12, low: 9 }] : [];
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ bars }));
+    vi.stubGlobal('fetch', fetcher);
+    await getStrategySymbolBars({ symbol: '510300.SH', provider: hit ? undefined : 'baostock' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it('keeps the deadline active until a slowly streamed JSON body is complete', async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn<typeof fetch>().mockImplementation(

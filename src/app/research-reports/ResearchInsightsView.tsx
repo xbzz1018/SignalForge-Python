@@ -21,7 +21,7 @@ import {
 } from "./ResearchConsolePrimitives";
 import { reportCandidates, reportCoverage, reportRisks, type ResearchCandidate } from "./researchViewModel";
 
-type CandidateAggregate = ResearchCandidate & { appearances: number; reportScore: number };
+type CandidateAggregate = ResearchCandidate & { appearances: number; reportScore: number | null };
 
 export function ResearchInsightsView({ data }: {
   data: ResearchAutomationDashboard;
@@ -39,12 +39,13 @@ export function ResearchInsightsView({ data }: {
         }
       }
     }
-    return Array.from(bySymbol.values()).sort((left, right) => (right.score ?? right.reportScore) - (left.score ?? left.reportScore));
+    return Array.from(bySymbol.values()).sort((left, right) => (right.score ?? right.reportScore ?? 0) - (left.score ?? left.reportScore ?? 0));
   }, [data.latestReports]);
 
   const evidence = data.latestReports.flatMap((report) => report.evidence);
   const readyEvidence = evidence.filter((item) => item.status === "available").length;
-  const averageScore = data.latestReports.length ? Math.round(data.latestReports.reduce((sum, report) => sum + report.score, 0) / data.latestReports.length) : null;
+  const scores = data.latestReports.map(report => report.score).filter(score => score !== null);
+  const averageScore = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
   const latestCoverage = data.latestReports[0] ? reportCoverage(data.latestReports[0]) : null;
   const risks = Array.from(new Set(data.latestReports.flatMap(reportRisks))).slice(0, 8);
   const signalCount = candidateRanking.reduce((sum, candidate) => sum + candidate.signals.length, 0);
@@ -54,7 +55,7 @@ export function ResearchInsightsView({ data }: {
       <ResearchSectionHeader eyebrow="RESEARCH INSIGHTS" title="主题洞察与证据地图" description="从最近报告中聚合候选标的、证据可用性、覆盖范围和复核事项，观察反复出现的研究信号。" />
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <ResearchMetricCard icon={<Target className="h-4 w-4" />} label="候选标的" value={candidateRanking.length} helper={`${signalCount} 个结构化研究信号`} tone="primary" />
-        <ResearchMetricCard icon={<Gauge className="h-4 w-4" />} label="平均研究评分" value={averageScore ?? "-"} helper={`${data.latestReports.length} 份近期报告`} tone={averageScore == null ? "slate" : averageScore >= 80 ? "emerald" : "amber"} />
+        <ResearchMetricCard icon={<Gauge className="h-4 w-4" />} label="平均研究评分" value={averageScore ?? "-"} helper={`${scores.length} 份已评分报告`} tone={averageScore == null ? "slate" : averageScore >= 80 ? "emerald" : "amber"} />
         <ResearchMetricCard icon={<Database className="h-4 w-4" />} label="可用证据" value={evidence.length ? `${readyEvidence}/${evidence.length}` : "-"} helper="按最新报告证据快照统计" tone={readyEvidence ? "emerald" : "blue"} />
         <ResearchMetricCard icon={<Layers3 className="h-4 w-4" />} label="股票池覆盖" value={latestCoverage ? `${Math.round(latestCoverage.coverageRatio * 100)}%` : "待采样"} helper={latestCoverage ? `${latestCoverage.readyCount}/${latestCoverage.memberCount} 个成员就绪` : "首次日报会写入覆盖快照"} tone={latestCoverage ? "blue" : "slate"} />
       </section>
@@ -64,7 +65,7 @@ export function ResearchInsightsView({ data }: {
           <ResearchSectionHeader eyebrow="CANDIDATE RADAR" title="候选标的雷达" description="按近期报告中的候选评分排序，并保留出现次数、涨跌与研究信号。" />
           {candidateRanking.length ? <div className="grid gap-3 md:grid-cols-2">{candidateRanking.map((candidate, index) => (
             <article key={`${candidate.symbol}-${candidate.name}`} className="rounded-xl border border-border/65 bg-card p-4 transition-colors hover:border-border">
-              <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-black text-primary">{index + 1}</span><div><h3 className="font-bold text-foreground">{candidate.name}</h3><p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{candidate.symbol} · 出现 {candidate.appearances} 次</p></div></div><div className="text-right"><p className={cn("text-sm font-black", candidate.changePercent != null && candidate.changePercent >= 0 ? "text-red-500" : "text-emerald-500")}>{candidate.changePercent == null ? "-" : `${candidate.changePercent >= 0 ? "+" : ""}${candidate.changePercent.toFixed(2)}%`}</p><p className={cn("mt-1 text-xs font-bold", scoreTone(candidate.score))}>{candidate.score ?? candidate.reportScore} 分</p></div></div>
+              <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-black text-primary">{index + 1}</span><div><h3 className="font-bold text-foreground">{candidate.name}</h3><p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{candidate.symbol} · 出现 {candidate.appearances} 次</p></div></div><div className="text-right"><p className={cn("text-sm font-black", candidate.changePercent != null && candidate.changePercent >= 0 ? "text-red-500" : "text-emerald-500")}>{candidate.changePercent == null ? "-" : `${candidate.changePercent >= 0 ? "+" : ""}${candidate.changePercent.toFixed(2)}%`}</p><p className={cn("mt-1 text-xs font-bold", scoreTone(candidate.score))}>{candidate.score ?? candidate.reportScore ?? "—"} 分</p></div></div>
               <div className="mt-4 flex flex-wrap gap-1.5">{candidate.signals.length ? candidate.signals.slice(0, 5).map((signal) => <Badge key={signal} variant="outline" className="text-[10px]">{signal}</Badge>) : <span className="text-xs text-muted-foreground">暂无结构化信号</span>}</div>
             </article>
           ))}</div> : <EmptyState icon={<Radar className="h-5 w-5" />} title="主题洞察将在首份日报生成后形成" description="候选标的、评分、涨跌与信号会从结构化报告中自动聚合。" className="flex-1 rounded-xl border border-border/60 bg-card py-10 sm:py-12" />}

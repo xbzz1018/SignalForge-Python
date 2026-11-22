@@ -204,6 +204,8 @@ async def get_intraday_history_quote(
             )
         raise
 
+    if len(response.bars) > limit:
+        response = response.model_copy(update={"bars": response.bars[-limit:]})
     response_with_metadata = with_intraday_fetch_metadata(
         response,
         status="miss",
@@ -263,7 +265,7 @@ def intraday_redis_cache_key(
 ) -> str:
     normalized_symbol = symbol.strip().upper()
     return (
-        f"intraday:v3:eastmoney:{normalized_symbol}:{period}:{cache_date.isoformat()}"
+        f"intraday:v4:eastmoney:{normalized_symbol}:{period}:{cache_date.isoformat()}"
         f":limit:{limit}:end:{end}"
     )
 

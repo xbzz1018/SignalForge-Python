@@ -25,7 +25,6 @@ from signalforge_market_data.services.kline_gateway import (
     get_local_kline_if_ready,
 )
 
-
 MAX_HISTORY_BARS = 1500
 
 
@@ -62,7 +61,11 @@ def _history_request(
             raise ValueError("limit 不足以覆盖策略预热与至少一根评估行情。")
         return limit, start_date, end_date
 
-    cutoff = date.fromisoformat(end_date) if end_date else datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    cutoff = (
+        date.fromisoformat(end_date)
+        if end_date
+        else datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    )
     first = date.fromisoformat(start_date)
     if first > cutoff:
         raise ValueError("回测开始日期不能晚于结束日期。")
@@ -81,7 +84,9 @@ def _check_coverage(
     if start:
         if sum(backtest_date(bar.date) < start for bar in kline.bars) < warmup:
             if len(kline.bars) >= MAX_HISTORY_BARS:
-                raise ValueError(f"{MAX_HISTORY_BARS} 根行情无法覆盖指定区间及指标预热，请缩短区间。")
+                raise ValueError(
+                    f"{MAX_HISTORY_BARS} 根行情无法覆盖指定区间及指标预热，请缩短区间。"
+                )
             raise ValueError("指定回测区间的指标预热行情不足，不能按默认样本替代。")
     else:
         if len(kline.bars) < limit:
