@@ -11,6 +11,7 @@ import {
 } from './workspace-path';
 
 const roots: string[] = [];
+const directoryLinkType = process.platform === 'win32' ? 'junction' : 'dir';
 
 async function temporaryProjectsRoot(): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'data-agent-workspaces-'));
@@ -55,7 +56,7 @@ describe('managed Data Agent workspaces', () => {
 
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'data-agent-outside-'));
     roots.push(outside);
-    await fs.symlink(outside, path.join(root, 'project-2'));
+    await fs.symlink(outside, path.join(root, 'project-2'), directoryLinkType);
     await expect(assertManagedWorkspaceExists('project-2', null, {
       projectsDir: root,
     })).rejects.toThrow('must be a real directory');
@@ -66,7 +67,7 @@ describe('managed Data Agent workspaces', () => {
     const realRoot = path.join(parent, 'real-projects');
     const aliasRoot = path.join(parent, 'projects-alias');
     await fs.mkdir(realRoot);
-    await fs.symlink(realRoot, aliasRoot);
+    await fs.symlink(realRoot, aliasRoot, directoryLinkType);
     await expect(assertManagedWorkspaceAvailable('project-1', {
       projectsDir: aliasRoot,
     })).rejects.toThrow('projects root must be a real directory');
