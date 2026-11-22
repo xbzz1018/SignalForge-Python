@@ -1,4 +1,5 @@
 import path from 'path';
+import { writeWorkspaceJsonAtomic } from '@/lib/data-agent/workspace-files';
 import { ensureBaselineEvidenceFiles } from '@/lib/quant/evidence';
 import { appendQuantWorkspaceEvent, ensureQuantWorkspace, QuantRunPlan } from '@/lib/domains/finance/workspace';
 import { type JsonRecord, type PrefetchResult, asRecord, extractBarsFromAsset } from './data-prefetch/values';
@@ -234,15 +235,14 @@ export async function prefetchQuantDataForRunPlan(params: {
         conclusion,
         warnings,
       };
-  const finalPath = path.join(params.projectPath, 'data_file', 'final', 'dashboard-data.json');
-  await writeJson(finalPath, finalData);
+  const finalDataPath = 'data_file/final/dashboard-data.json';
+  await writeWorkspaceJsonAtomic(params.projectPath, finalDataPath, finalData);
 
   await ensureBaselineEvidenceFiles(params.projectPath, { force: true });
   if (imageExtractionEvidence) {
     await augmentEvidenceWithImageExtraction(params.projectPath, imageExtractionEvidence);
   }
 
-  const finalDataPath = path.relative(params.projectPath, finalPath).replaceAll(path.sep, '/');
   await appendQuantWorkspaceEvent(params.projectPath, {
     event_type: 'data_prefetched',
     stage: 'data_collection',
