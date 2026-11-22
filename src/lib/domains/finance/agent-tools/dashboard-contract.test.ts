@@ -250,10 +250,13 @@ describe("inspect_dashboard_contract tool", () => {
   });
 
   it("fails closed when a fixed contract path escapes through a symbolic link", async () => {
-    await fs.mkdir(path.join(workspace, "app"), { recursive: true });
     const outsidePage = path.join(outside, "page.tsx");
     await fs.writeFile(outsidePage, "HOST-SECRET\n", "utf8");
-    await fs.symlink(outsidePage, path.join(workspace, "app", "page.tsx"));
+    await fs.symlink(
+      outside,
+      path.join(workspace, "app"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
 
     const result = await invoke(
       createInspectDashboardContractTool({

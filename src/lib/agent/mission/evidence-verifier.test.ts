@@ -424,8 +424,9 @@ describe('PI Agent EvidenceVerifier', () => {
     await writeFile(outside, 'secret.ts', 'export const secret = true;\n');
     await fs.mkdir(path.join(fixture.root, 'components'), { recursive: true });
     await fs.symlink(
-      path.join(outside, 'secret.ts'),
-      path.join(fixture.root, 'components', 'escaped.ts'),
+      outside,
+      path.join(fixture.root, 'components', 'escaped'),
+      process.platform === 'win32' ? 'junction' : 'dir',
     );
 
     await expect(verify(fixture)).rejects.toEqual(

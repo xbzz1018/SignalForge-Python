@@ -128,8 +128,12 @@ describe('PI Agent image extraction tool', () => {
     const direct = await tool.execute({ imagePath: outsideImage }, toolContext());
     expect(direct).toMatchObject({ ok: false, error: { code: 'ABSOLUTE_PATH_DENIED' } });
 
-    await fs.symlink(outsideImage, path.join(workspace, 'uploads', 'escape.png'));
-    const symlink = await tool.execute({ imagePath: 'uploads/escape.png' }, toolContext());
+    await fs.symlink(
+      outside,
+      path.join(workspace, 'uploads', 'escape'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const symlink = await tool.execute({ imagePath: 'uploads/escape/outside.png' }, toolContext());
     expect(symlink).toMatchObject({ ok: false, error: { code: 'SYMLINK_ESCAPE_DENIED' } });
   });
 
