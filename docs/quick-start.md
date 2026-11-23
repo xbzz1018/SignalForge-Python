@@ -60,6 +60,15 @@ Memory、知识服务、ClickHouse 和 Loki/Grafana/Alloy 按需接入，详见[
 
 ## 检查运行状态
 
+如果网页能打开但行情缺失，先在另一个终端检查数据库、缓存和行情进程。以下命令使用行情服务的默认端口 8000。修改过端口时，使用启动日志里的地址。
+
+```bash
+docker compose ps timescaledb redis
+curl -fsS http://127.0.0.1:8000/health
+```
+
+行情服务响应后，再检查模型连接和行情覆盖。
+
 ```bash
 npm run doctor:full -- --model=deepseek-v4-flash
 npm run check:market-freshness
