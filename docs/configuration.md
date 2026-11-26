@@ -40,6 +40,16 @@ SignalForge 支持这些长期运行方式：
 
 Docker Compose 默认读取进程变量与 `.env`，不会自动读取 `.env.local`。将容器端口和数据库账号维护在 `.env`，并同步应用连接地址；默认 PostgreSQL、Redis、ClickHouse HTTP/Native 端口分别为 `35433`、`36380`、`38123`、`39023`。初始化脚本会按已有端口和账号生成缺失的连接地址，保留已配置的外部服务地址。
 
+如果本机已修改了数据库端口，可在服务启动后从仓库根目录查看 Compose 实际绑定的宿主机端口：
+
+```powershell
+docker compose port timescaledb 5432
+docker compose port redis 6379
+docker compose port clickhouse 8123
+```
+
+本机运行的应用按输出的端口填写 `DATABASE_URL`、`REDIS_URL` 和 `CLICKHOUSE_URL`。
+
 项目 `.npmrc` 统一使用官方 npm registry，`package-lock.json` 保留完整性校验。安装依赖使用 `npm ci`；`npm run check:dependency-sources` 在 CI 安装前和发布质量门中检查来源，拒绝镜像源、凭据 URL 和缺失的 SHA-512 摘要。
 
 `package.json` 中对 `@prisma/config` 的 `deepmerge-ts` 覆盖固定到 `8.0.0`，用于修复 [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx)；已验证配置加载、Prisma generate/validate 和完整迁移回归。后续 Prisma 上游依赖修复后再移除该覆盖，避免升级时重新引入旧版本。
